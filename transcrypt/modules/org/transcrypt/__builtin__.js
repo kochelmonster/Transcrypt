@@ -51,7 +51,7 @@ export function __super__ (aClass, methodName) {
 
     throw new Exception ('Superclass method not found');    // !!! Improve!
 }
-    
+
 // Python property installer function, no member since that would bloat classes
 export function property (getter, setter) {  // Returns a property descriptor rather than a property
     if (!setter) {  // ??? Make setter optional instead of dummy?
@@ -123,7 +123,7 @@ export function __withblock__ (manager, statements) {
         statements ();
         manager.close ();
     }
-};  
+};
 
 // Manipulating attributes by name
 
@@ -140,8 +140,15 @@ export function setattr (obj, name, value) {
     obj [name] = value; // Will not work in combination with static retrieval of aliased attributes, too expensive
 };
 
-export function getattr (obj, name) {
-    return name in obj ? obj [name] : obj ['py_' + name];
+export function getattr (obj, name, default_) {
+  if (default_ === undefined)
+      return name in obj ? obj [name] : obj ['py_' + name];
+  try {
+      return name in obj ? obj [name] : default_;
+  }
+  catch (exception) {
+  }
+  return default_;
 };
 
 export function hasattr (obj, name) {
@@ -233,28 +240,28 @@ export function __k__ (keyed, key) {  //  Check existence of dict key via retrie
 
 // If the target object is somewhat true, return it. Otherwise return false.
 // Try to follow Python conventions of truthyness
-export function __t__ (target) { 
+export function __t__ (target) {
     return (
         // Avoid invalid checks
         target === undefined || target === null ? false :
-        
+
         // Take a quick shortcut if target is a simple type
         ['boolean', 'number'] .indexOf (typeof target) >= 0 ? target :
-        
+
         // Use __bool__ (if present) to decide if target is true
         target.__bool__ instanceof Function ? (target.__bool__ () ? target : false) :
-        
+
         // There is no __bool__, use __len__ (if present) instead
         target.__len__ instanceof Function ?  (target.__len__ () !== 0 ? target : false) :
-        
+
         // There is no __bool__ and no __len__, declare Functions true.
         // Python objects are transpiled into instances of Function and if
         // there is no __bool__ or __len__, the object in Python is true.
         target instanceof Function ? target :
-        
+
         // Target is something else, compute its len to decide
         len (target) !== 0 ? target :
-        
+
         // When all else fails, declare target as false
         false
     );
@@ -312,7 +319,7 @@ Number.prototype.__format__ = function (fmt_spec) {
     var val = this.valueOf ();
     var is_negative = val < 0;
     val = Math.abs (val);
-    
+
     function pad (s, width, fill, align) {
         if (fill == undefined) {
             fill = ' ';
@@ -347,7 +354,7 @@ Number.prototype.__format__ = function (fmt_spec) {
                 throw ValueError ("Invalid align type: '" + align + "'", new Error ());
         }
     };
-    
+
     function format_float (val) {
         if (val.indexOf ('e+') == -1 && (ftype == 'g' || ftype == 'G')) {
             var parts = val.py_split ('.');
@@ -363,7 +370,7 @@ Number.prototype.__format__ = function (fmt_spec) {
         }
         return val;
     };
-           
+
     if (fmt_spec.endswith (['b', 'c', 'd', 'e', 'E', 'f', 'F', 'g', 'G', 'n', 'o', 'x', 'X', '%'])) {
         ftype = fmt_spec [fmt_spec.length - 1];
         fmt_spec = fmt_spec.slice (0, -1);
@@ -375,7 +382,7 @@ Number.prototype.__format__ = function (fmt_spec) {
         ftype = Number.isInteger (val) ? 'd' : 'g';
         g_default = true;
     }
-    
+
     var parts = fmt_spec.split ('.');
     fmt_spec = parts [0];
     precision = parts [1];
@@ -417,7 +424,7 @@ Number.prototype.__format__ = function (fmt_spec) {
             fill = fmt_spec [0];
         }
     }
-    
+
     if (isNaN (val)) {
         val = 'nan';
     }
@@ -535,7 +542,7 @@ Number.prototype.__format__ = function (fmt_spec) {
     return val;
 };
 __pragma__ ('endif')
-   
+
 export function bool (any) {     // Always truly returns a bool, rather than something truthy or falsy
     return !!__t__ (any);
 };
@@ -561,6 +568,25 @@ export function py_typeof (anObject) {
         );
     }
 };
+
+var pid_counter = 0
+
+export function py_id (anObject) {
+  var pid = anObject.py_identifier
+  if (pid) {
+      return pid;
+  }
+
+  var aType = typeof anObject;
+  if (aType == 'object') {
+      pid = anObject.py_identifier = "__po" + pid_counter;
+      pid_counter++;
+  }
+  else {
+    pid = anObject.toString();
+  }
+  return pid;
+}
 
 export function issubclass (aClass, classinfo) {
     if (classinfo instanceof Array) {   // Assume in most cases it isn't, then making it recursive rather than two functions saves a call
@@ -590,7 +616,7 @@ export function issubclass (aClass, classinfo) {
             return false;
         }
     }
-    catch (exception) {     // Using issubclass on primitives assumed rare 
+    catch (exception) {     // Using issubclass on primitives assumed rare
         return aClass == classinfo || classinfo == object;
     }
 };
@@ -669,12 +695,12 @@ export function ord (aChar) {
 
 // Maximum of n numbers
 export function max (nrOrSeq) {
-    return arguments.length == 1 ? Math.max (...nrOrSeq) : Math.max (...arguments);       
+    return arguments.length == 1 ? Math.max (...nrOrSeq) : Math.max (...arguments);
 };
 
 // Minimum of n numbers
 export function min (nrOrSeq) {
-    return arguments.length == 1 ? Math.min (...nrOrSeq) : Math.min (...arguments);       
+    return arguments.length == 1 ? Math.min (...nrOrSeq) : Math.min (...arguments);
 };
 
 // Absolute value
@@ -732,7 +758,7 @@ export function format (value, fmt_spec) {
             }
         default:
             return str (value).__format__ (fmt_spec);
-    }        
+    }
 }
 __pragma__ ('endif')
 
@@ -1123,6 +1149,21 @@ export function set (iterable) {
 set.__name__ = 'set';
 set.__bases__ = [object];
 
+
+export function frozenset (iterable) {
+    let instance = [];
+    if (iterable) {
+        for (let index = 0; index < iterable.length; index++) {
+            instance.add (iterable [index]);
+        }
+    }
+    instance.__class__ = frozenset;   // Not all arrays are sets
+    return instance;
+}
+frozenset.__name__ = 'frozenset';
+frozenset.__bases__ = [object];
+
+
 Array.prototype.__bindexOf__ = function (element) { // Used to turn O (n^2) into O (n log n)
 // Since sorting is lex, compare has to be lex. This also allows for mixed lists
 
@@ -1435,7 +1476,7 @@ String.prototype.__format__ = function (fmt_spec) {
     var align = '<';
     var fill = ' ';
     var val = this.valueOf ();
-    
+
     function pad (s, width, fill, align) {
         var len = s.length;
         var c = width - len;
@@ -1521,7 +1562,7 @@ __pragma__ ('ifdef', '__sform__')
                         key = key.substring (0, idx);
                     }
                 }
-                    
+
                 if ((key == +key) && attr && args [key] !== undefined) {
                     value = args [key][attr];
                 }
@@ -1534,7 +1575,7 @@ __pragma__ ('ifdef', '__sform__')
                                 value = args [index][key][attr];
                             }
                             else {
-                                value = args [index][key]; 
+                                value = args [index][key];
                             }
                             break;
                         }
@@ -1834,7 +1875,7 @@ export function dict (objectOrPairs) {
                      // checks to make sure that these objects
                      // get converted to dict objects instead of
                      // leaving them as js objects.
-                     
+
                      if (!isinstance (objectOrPairs, dict)) {
                          val = dict (val);
                      }
@@ -1849,7 +1890,7 @@ export function dict (objectOrPairs) {
             // N.B. - this is a shallow copy per python std - so
             // it is assumed that children have already become
             // python objects at some point.
-            
+
             var aKeys = objectOrPairs.py_keys ();
             for (var index = 0; index < aKeys.length; index++ ) {
                 var key = aKeys [index];
@@ -1862,7 +1903,7 @@ export function dict (objectOrPairs) {
             // We have already covered Array so this indicates
             // that the passed object is not a js object - i.e.
             // it is an int or a string, which is invalid.
-            
+
             throw ValueError ("Invalid type of object for dict creation", new Error ());
         }
     }
@@ -1944,7 +1985,7 @@ export function __pow__ (a, b) {
 
 export var pow = __pow__;   // Make available as builin under usual name
 
-__pragma__ ('ifndef', '__xtiny__')    
+__pragma__ ('ifndef', '__xtiny__')
 
 export function __neg__ (a) {
     if (typeof a == 'object' && '__neg__' in a) {
@@ -2327,7 +2368,7 @@ export function __ior__ (a, b) {
         return a |= b;
     }
 };
-    
+
 export function __ixor__ (a, b) {
     if (typeof a == 'object' && '__ixor__' in a) {
         return a.__ixor__ (b);
@@ -2368,7 +2409,7 @@ export function __getitem__ (container, key) {                           // Slic
         return container [container.length + key];
     }
     else {
-        return container [key];                                         // Container must support bare JavaScript brackets          
+        return container [key];                                         // Container must support bare JavaScript brackets
         /*
         If it turns out keychecks really have to be supported here, the following will work
         return __k__ (container, key);
