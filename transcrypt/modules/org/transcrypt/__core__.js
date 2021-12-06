@@ -56,18 +56,18 @@ will generate
     var modules = {};
     __nest__ (a, 'b.c.d.e', __init__ (__world__.a.b.c.d.e));
     __nest__ (a, 'b.c', __init__ (__world__.a.b.c));
-    
+
 The task of the __nest__ function is to start at the head object and then walk to the chain of objects behind it (tail),
-creating the ones that do not exist already, and insert the necessary module reference attributes into them.   
+creating the ones that do not exist already, and insert the necessary module reference attributes into them.
 */
 
-export function __nest__ (headObject, tailNames, value) {    
+export function __nest__ (headObject, tailNames, value) {
     var current = headObject;
     // In some cases this will be <main function>.__all__,
     // which is the main module and is also known under the synonym <main function.__world__.
     // N.B. <main function> is the entry point of a Transcrypt application,
     // Carrying the same name as the application except the file name extension.
-    
+
     if (tailNames != '') {  // Split on empty string doesn't give empty list
         // Find the last already created object in tailNames
         var tailChain = tailNames.split ('.');
@@ -79,20 +79,20 @@ export function __nest__ (headObject, tailNames, value) {
             }
             current = current [tailChain [index]];
         }
-        
+
         // Create the rest of the objects, if any
         for (var index = firstNewIndex; index < tailChain.length; index++) {
             current [tailChain [index]] = {};
             current = current [tailChain [index]];
         }
     }
-    
-    // Insert its new properties, it may have been created earlier and have other attributes     
-    for (let attrib of Object.getOwnPropertyNames (value)) {       
+
+    // Insert its new properties, it may have been created earlier and have other attributes
+    for (let attrib of Object.getOwnPropertyNames (value)) {
         Object.defineProperty (current, attrib, {
             get () {return value [attrib];},
             enumerable: true,
-            configurable: true        
+            configurable: true
         });
     }
 };
@@ -118,7 +118,7 @@ export function __get__ (aThis, func, quotedFuncName) {// Param aThis is thing b
                     value: function () {                            // So next time just call curry function that calls function
                         var args = [] .slice.apply (arguments);
                         return func.apply (null, [aThis] .concat (args));
-                    },              
+                    },
                     writable: true,
                     enumerable: true,
                     configurable: true
@@ -156,12 +156,12 @@ export function __getcm__ (aThis, func, quotedFuncName) {
 export function __getsm__ (aThis, func, quotedFuncName) {
     return func;
 };
-    
-// Mother of all metaclasses        
+
+// Mother of all metaclasses
 export var py_metatype = {
     __name__: 'type',
     __bases__: [],
-    
+
     // Overridable class creation worker
     __new__: function (meta, name, bases, attribs) {
         // Create the class cls, a functor, which the class creator function will return
@@ -169,7 +169,7 @@ export var py_metatype = {
             var args = [] .slice.apply (arguments); // It has a __new__ method, not yet but at call time, since it is copied from the parent in the loop below
             return cls.__new__ (args);              // Each Python class directly or indirectly derives from object, which has the __new__ method
         };                                          // If there are no bases in the Python source, the compiler generates [object] for this parameter
-        
+
         // Copy all methods, including __new__, properties and static attributes from base classes to new cls object
         // The new class object will simply be the prototype of its instances
         // JavaScript prototypical single inheritance will do here, since any object has only one class
@@ -182,18 +182,18 @@ export var py_metatype = {
                     continue;
                 }
                 Object.defineProperty (cls, attrib, descrip);
-            }           
+            }
             for (let symbol of Object.getOwnPropertySymbols (base)) {
                 let descrip = Object.getOwnPropertyDescriptor (base, symbol);
                 Object.defineProperty (cls, symbol, descrip);
             }
         }
-        
+
         // Add class specific attributes to the created cls object
         cls.__metaclass__ = meta;
         cls.__name__ = name.startsWith ('py_') ? name.slice (3) : name;
         cls.__bases__ = bases;
-        
+
         // Add own methods, properties and own static attributes to the created cls object
         for (var attrib in attribs) {
             var descrip = Object.getOwnPropertyDescriptor (attribs, attrib);
@@ -204,8 +204,12 @@ export var py_metatype = {
             Object.defineProperty (cls, symbol, descrip);
         }
 
+        meta.__init__(cls, name, bases, attribs)
         // Return created cls object
         return cls;
+    },
+
+    __init__: function(cls, name, bases, attribs) {
     }
 };
 py_metatype.__metaclass__ = py_metatype;
@@ -213,18 +217,18 @@ py_metatype.__metaclass__ = py_metatype;
 // Mother of all classes
 export var object = {
     __init__: function (self) {},
-    
+
     __metaclass__: py_metatype, // By default, all classes have metaclass type, since they derive from object
     __name__: 'object',
     __bases__: [],
-        
+
     // Object creator function, is inherited by all classes (so could be global)
-    __new__: function (args) {  // Args are just the constructor args       
+    __new__: function (args) {  // Args are just the constructor args
         // In JavaScript the Python class is the prototype of the Python object
         // In this way methods and static attributes will be available both with a class and an object before the dot
         // The descriptor produced by __get__ will return the right method flavor
         var instance = Object.create (this, {__class__: {value: this, enumerable: true}});
-        
+
         if ('__getattr__' in this || '__setattr__' in this) {
             instance.__proxy__ = new Proxy (instance, {
                 get: function (target, name) {
@@ -254,7 +258,7 @@ export var object = {
 
         // Return constructed instance
         return instance;
-    }   
+    }
 };
 
 // Class creator facade function, calls class creation worker
@@ -262,7 +266,7 @@ export function __class__ (name, bases, attribs, meta) {         // Parameter me
     if (meta === undefined) {
         meta = bases [0] .__metaclass__;
     }
-            
+
     return meta.__new__ (meta, name, bases, attribs);
 };
 
