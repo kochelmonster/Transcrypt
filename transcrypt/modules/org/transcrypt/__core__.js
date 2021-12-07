@@ -157,6 +157,35 @@ export function __getsm__ (aThis, func, quotedFuncName) {
     return func;
 };
 
+
+function _is_python_descryptor(descript) {
+  if (descript.value === undefined || descript.value === null)
+    return false;
+
+  return descript.value.__get__ !== undefined;
+}
+
+function _to_python_descriptor(instance, descript) {
+  // use python descriptor protocol
+  var value = descript.value;
+
+  var get = value.__get__;
+  descript.get = function() {
+      return get(instance);
+  }
+
+  if (value.__set__) {
+    var set = value.__set__;
+    descript.set = function(val) {
+        set(instance, val);
+    }
+  }
+
+  delete descript.value;
+  delete descript.writable;
+  return descript;
+}
+
 // Mother of all metaclasses
 export var py_metatype = {
     __name__: 'type',
@@ -170,6 +199,8 @@ export var py_metatype = {
             return cls.__new__ (args);              // Each Python class directly or indirectly derives from object, which has the __new__ method
         };                                          // If there are no bases in the Python source, the compiler generates [object] for this parameter
 
+        var python_descriptors = []
+
         // Copy all methods, including __new__, properties and static attributes from base classes to new cls object
         // The new class object will simply be the prototype of its instances
         // JavaScript prototypical single inheritance will do here, since any object has only one class
@@ -182,6 +213,8 @@ export var py_metatype = {
                     continue;
                 }
                 Object.defineProperty (cls, attrib, descrip);
+                if (_is_python_descryptor (descrip))
+                    python_descriptors.push (attrib);
             }
             for (let symbol of Object.getOwnPropertySymbols (base)) {
                 let descrip = Object.getOwnPropertyDescriptor (base, symbol);
@@ -195,14 +228,20 @@ export var py_metatype = {
         cls.__bases__ = bases;
 
         // Add own methods, properties and own static attributes to the created cls object
+
         for (var attrib in attribs) {
             var descrip = Object.getOwnPropertyDescriptor (attribs, attrib);
             Object.defineProperty (cls, attrib, descrip);
+            if (_is_python_descryptor (descrip))
+                python_descriptors.push (attrib);
         }
         for (let symbol of Object.getOwnPropertySymbols (attribs)) {
             let descrip = Object.getOwnPropertyDescriptor (attribs, symbol);
             Object.defineProperty (cls, symbol, descrip);
         }
+
+        if (python_descriptors.length)
+            cls.__descriptors__ = python_descriptors;
 
         meta.__init__(cls, name, bases, attribs)
         // Return created cls object
@@ -250,7 +289,14 @@ export var object = {
                     return true;
                 }
             })
-			instance = instance.__proxy__
+			      instance = instance.__proxy__
+        }
+
+        if (this.__descriptors__) {
+            for (var attrib of this.__descriptors__) {
+                var descrip = Object.getOwnPropertyDescriptor (this, attrib);
+                Object.defineProperty (instance, attrib, _to_python_descriptor(instance, descrip));
+            }
         }
 
         // Call constructor
