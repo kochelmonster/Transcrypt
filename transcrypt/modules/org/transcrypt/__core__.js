@@ -272,7 +272,7 @@ export var object = {
             instance.__proxy__ = new Proxy (instance, {
                 get: function (target, name) {
                     let result = target [name];
-                    if (result == undefined) {  // Target doesn't have attribute named name
+                    if (result === undefined) {  // Target doesn't have attribute named name
                         return target.__getattr__ (name);
                     }
                     else {
