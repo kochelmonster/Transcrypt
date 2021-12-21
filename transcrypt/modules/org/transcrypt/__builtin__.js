@@ -549,6 +549,9 @@ export function bool (any) {     // Always truly returns a bool, rather than som
 bool.__name__ = 'bool';         // So it can be used as a type with a name
 bool.__bases__ = [int];
 
+
+export var aFunction = {__name__: "function"};
+
 export function py_typeof (anObject) {
     var aType = typeof anObject;
     if (aType == 'object') {    // Directly trying '__class__ in anObject' turns out to wreck anObject in Chrome if its a primitive
@@ -558,6 +561,9 @@ export function py_typeof (anObject) {
         catch (exception) {
             return aType;
         }
+    }
+    else if (aType == 'function') {
+      return aFunction;
     }
     else {
         return (    // Odly, the braces are required here
@@ -1664,7 +1670,14 @@ String.prototype.py_replace = function (old, aNew, maxreplace) {
     return this.split (old, maxreplace) .join (aNew);
 };
 
-String.prototype.lstrip = function () {
+String.prototype.lstrip = function (chars) {
+    if (chars) {
+        var start = 0;
+        while (characters.indexOf (x[start]) >= 0) {
+            start += 1;
+        }
+        return this.slice (start);
+    }
     return this.replace (/^\s*/g, '');
 };
 
@@ -1696,8 +1709,15 @@ String.prototype.rsplit = function (sep, maxsplit) {    // Combination of genera
     }
 };
 
-String.prototype.rstrip = function () {
-    return this.replace (/\s*$/g, '');
+String.prototype.rstrip = function (chars) {
+  if (chars) {
+      var end = this.length - 1;
+      while (chars.indexOf (x[end]) >= 0) {
+          end -= 1;
+      }
+      return this.slice (0, end + 1);
+  }
+  return this.replace (/\s*$/g, '');
 };
 
 String.prototype.py_split = function (sep, maxsplit) {  // Combination of general whitespace sep and positive maxsplit neither supported nor checked, expensive and rare
