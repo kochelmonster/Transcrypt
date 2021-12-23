@@ -550,7 +550,7 @@ bool.__name__ = 'bool';         // So it can be used as a type with a name
 bool.__bases__ = [int];
 
 
-export var aFunction = {__name__: "function"};
+export var FunctionType = {__name__: "function", __module__: "builtins", __bases__: [object]};
 
 export function py_typeof (anObject) {
     var aType = typeof anObject;
@@ -563,7 +563,7 @@ export function py_typeof (anObject) {
         }
     }
     else if (aType == 'function') {
-      return aFunction;
+      return FunctionType;
     }
     else {
         return (    // Odly, the braces are required here
@@ -1673,7 +1673,7 @@ String.prototype.py_replace = function (old, aNew, maxreplace) {
 String.prototype.lstrip = function (chars) {
     if (chars) {
         var start = 0;
-        while (characters.indexOf (x[start]) >= 0) {
+        while (chars.indexOf (this[start]) >= 0) {
             start += 1;
         }
         return this.slice (start);
@@ -1712,7 +1712,7 @@ String.prototype.rsplit = function (sep, maxsplit) {    // Combination of genera
 String.prototype.rstrip = function (chars) {
   if (chars) {
       var end = this.length - 1;
-      while (chars.indexOf (x[end]) >= 0) {
+      while (chars.indexOf (this[end]) >= 0) {
           end -= 1;
       }
       return this.slice (0, end + 1);
@@ -1754,7 +1754,10 @@ String.prototype.startswith = function (prefix) {
     return false;
 };
 
-String.prototype.strip = function () {
+String.prototype.strip = function (chars) {
+    if (chars) {
+        return this.lstrip (chars).rstrip (chars);
+    }
     return this.trim ();
 };
 
@@ -2103,10 +2106,10 @@ export function __sub__ (a, b) {
 // Overloaded binary bitwise
 
 export function __lshift__ (a, b) {
-    if (typeof a == 'object' && '__lshift__' in a) {
+    if (a && typeof a == 'object' && '__lshift__' in a) {
         return a.__lshift__ (b);
     }
-    else if (typeof b == 'object' && '__rlshift__' in b) {
+    else if (b && typeof b == 'object' && '__rlshift__' in b) {
         return b.__rlshift__ (a);
     }
     else {
@@ -2115,10 +2118,10 @@ export function __lshift__ (a, b) {
 };
 
 export function __rshift__ (a, b) {
-    if (typeof a == 'object' && '__rshift__' in a) {
+    if (a && typeof a == 'object' && '__rshift__' in a) {
         return a.__rshift__ (b);
     }
-    else if (typeof b == 'object' && '__rrshift__' in b) {
+    else if (b && typeof b == 'object' && '__rrshift__' in b) {
         return b.__rrshift__ (a);
     }
     else {
@@ -2127,10 +2130,10 @@ export function __rshift__ (a, b) {
 };
 
 export function __or__ (a, b) {
-    if (typeof a == 'object' && '__or__' in a) {
+    if (a && typeof a == 'object' && '__or__' in a) {
         return a.__or__ (b);
     }
-    else if (typeof b == 'object' && '__ror__' in b) {
+    else if (b && typeof b == 'object' && '__ror__' in b) {
         return b.__ror__ (a);
     }
     else {
@@ -2139,10 +2142,10 @@ export function __or__ (a, b) {
 };
 
 export function __xor__ (a, b) {
-    if (typeof a == 'object' && '__xor__' in a) {
+    if (a && typeof a == 'object' && '__xor__' in a) {
         return a.__xor__ (b);
     }
-    else if (typeof b == 'object' && '__rxor__' in b) {
+    else if (b && typeof b == 'object' && '__rxor__' in b) {
         return b.__rxor__ (a);
     }
     else {
@@ -2151,10 +2154,10 @@ export function __xor__ (a, b) {
 };
 
 export function __and__ (a, b) {
-    if (typeof a == 'object' && '__and__' in a) {
+    if (a && typeof a == 'object' && '__and__' in a) {
         return a.__and__ (b);
     }
-    else if (typeof b == 'object' && '__rand__' in b) {
+    else if (b && typeof b == 'object' && '__rand__' in b) {
         return b.__rand__ (a);
     }
     else {
@@ -2165,7 +2168,7 @@ export function __and__ (a, b) {
 // Overloaded binary compare
 
 export function __eq__ (a, b) {
-    if (typeof a == 'object' && '__eq__' in a) {
+    if (a && typeof a == 'object' && '__eq__' in a) {
         return a.__eq__ (b);
     }
     else {
@@ -2174,7 +2177,7 @@ export function __eq__ (a, b) {
 };
 
 export function __ne__ (a, b) {
-    if (typeof a == 'object' && '__ne__' in a) {
+    if (a && typeof a == 'object' && '__ne__' in a) {
         return a.__ne__ (b);
     }
     else {
@@ -2183,7 +2186,7 @@ export function __ne__ (a, b) {
 };
 
 export function __lt__ (a, b) {
-    if (typeof a == 'object' && '__lt__' in a) {
+    if (a && typeof a == 'object' && '__lt__' in a) {
         return a.__lt__ (b);
     }
     else {
@@ -2192,7 +2195,7 @@ export function __lt__ (a, b) {
 };
 
 export function __le__ (a, b) {
-    if (typeof a == 'object' && '__le__' in a) {
+    if (a && typeof a == 'object' && '__le__' in a) {
         return a.__le__ (b);
     }
     else {
@@ -2201,7 +2204,7 @@ export function __le__ (a, b) {
 };
 
 export function __gt__ (a, b) {
-    if (typeof a == 'object' && '__gt__' in a) {
+    if (a && typeof a == 'object' && '__gt__' in a) {
         return a.__gt__ (b);
     }
     else {
@@ -2210,7 +2213,7 @@ export function __gt__ (a, b) {
 };
 
 export function __ge__ (a, b) {
-    if (typeof a == 'object' && '__ge__' in a) {
+    if (a && typeof a == 'object' && '__ge__' in a) {
         return a.__ge__ (b);
     }
     else {

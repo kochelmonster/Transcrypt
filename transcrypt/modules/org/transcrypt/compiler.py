@@ -2906,7 +2906,7 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
         node = importHoistMemo.node
         self.adaptLineNrString (node)               # If it isn't (again) obtained from the node, the memoed version will be used
 
-        if node.module.startswith (self.stubsName):
+        if node.module is not None and node.module.startswith (self.stubsName):
             return
 
         '''
@@ -2937,7 +2937,8 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                     module_name.append("__init__")
 
                 module_name = module_name[:-node.level]
-                module_name.append(node.module)
+                if node.module is not None:
+                    module_name.append(node.module)
                 module_name = ".".join(module_name)
             else:
                 module_name = node.module

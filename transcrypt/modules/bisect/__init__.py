@@ -33,6 +33,7 @@ def bisect_right(a, x, lo=0, hi=None, *, key=None):
         hi = len(a)
     # Note, the comparison uses "<" to match the
     # __lt__() logic in list.sort() and in heapq.
+    # __pragma__ ("opov")
     if key is None:
         while lo < hi:
             mid = (lo + hi) // 2
@@ -47,6 +48,7 @@ def bisect_right(a, x, lo=0, hi=None, *, key=None):
                 hi = mid
             else:
                 lo = mid + 1
+    # __pragma__ ("noopov")
     return lo
 
 
@@ -65,6 +67,7 @@ def insort_left(a, x, lo=0, hi=None, *, key=None):
         lo = bisect_left(a, key(x), lo, hi, key=key)
     a.insert(lo, x)
 
+
 def bisect_left(a, x, lo=0, hi=None, *, key=None):
     """Return the index where to insert item x in list a, assuming a is sorted.
 
@@ -82,6 +85,7 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
         hi = len(a)
     # Note, the comparison uses "<" to match the
     # __lt__() logic in list.sort() and in heapq.
+    # __pragma__ ("opov")
     if key is None:
         while lo < hi:
             mid = (lo + hi) // 2
@@ -96,6 +100,7 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
                 lo = mid + 1
             else:
                 hi = mid
+    # __pragma__ ("noopov")
     return lo
 
 
