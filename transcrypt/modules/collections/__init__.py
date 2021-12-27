@@ -1,5 +1,5 @@
 # __pragma__ ('skip')
-def __pragma__(): pass
+def __pragma__(*args): pass
 # __pragma__ ('noskip')
 
 
@@ -9,8 +9,11 @@ var deque_ = function(src) {
     return this
 }
 deque_.prototype = Object.create(Array.prototype);
-deque_.prototype.appendLeft = function(item) {
+deque_.prototype.appendleft = function(item) {
   this.unshift(item);
+}
+deque_.prototype.popleft = function() {
+  return this.shift();
 }
 ''')
 

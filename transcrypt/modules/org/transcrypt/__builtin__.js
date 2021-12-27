@@ -2171,6 +2171,9 @@ export function __eq__ (a, b) {
     if (a && typeof a == 'object' && '__eq__' in a) {
         return a.__eq__ (b);
     }
+    else if (b && typeof b == 'object' && '__eq__' in b) {
+        return b.__eq__ (a);
+    }
     else {
         return a == b;
     }
@@ -2179,6 +2182,9 @@ export function __eq__ (a, b) {
 export function __ne__ (a, b) {
     if (a && typeof a == 'object' && '__ne__' in a) {
         return a.__ne__ (b);
+    }
+    else if (b && typeof b == 'object' && '__ne__' in b) {
+        return b.__ne__ (a);
     }
     else {
         return a != b
