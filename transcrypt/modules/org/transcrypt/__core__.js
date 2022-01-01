@@ -124,10 +124,12 @@ export function __get__ (aThis, func, quotedFuncName) {// Param aThis is thing b
                     configurable: true
                 });
             }
-            return function () {                                    // Return bound function, code duplication for efficiency if no memoizing
+            var bound = function () {                                   // Return bound function, code duplication for efficiency if no memoizing
                 var args = [] .slice.apply (arguments);             // So multilayer search prototype, apply __get__, call curry func that calls func
                 return func.apply (null, [aThis.__proxy__ ? aThis.__proxy__ : aThis] .concat (args));
             };
+            bound.__org__ = func
+            return bound
         }
         else {                                                      // Class before the dot
             return func;                                            // Return static method
