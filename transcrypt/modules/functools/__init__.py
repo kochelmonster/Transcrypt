@@ -40,3 +40,7 @@ def wraps(wrapped):
        update_wrapper().
     """
     return wrapped  # do nothing
+
+
+def update_wrapper(wrapper, wrapped):
+    return wrapper
