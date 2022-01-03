@@ -1,13 +1,13 @@
 
 def itemgetter(item, *items):
-    if not items:
+    if not len(items):
         def func(obj):
-            return obj[item]
+            return obj[item]  # __:opov
     else:
         items = (item,) + items  # __:opov
 
         def func(obj):
-            return [obj[i] for i in items]
+            return [obj[i] for i in items]  # __:opov
     return func
 
 
