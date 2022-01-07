@@ -39,17 +39,52 @@ export function __globals__ (anObject) {
 }
 */
 
-// Partial implementation of super () .<methodName> (<params>)
-export function __super__ (aClass, methodName) {
-    // Lean and fast, no C3 linearization, only call first implementation encountered
-    // Will allow __super__ ('<methodName>') (self, <params>) rather than only <className>.<methodName> (self, <params>)
-    for (let base of aClass.__bases__) {
-        if (methodName in base) {
-           return base [methodName];
+
+function build_mro(aClass) {
+    let done = {}
+    let result = [];
+    function iterate_bases(bases) {
+        for(var i = bases.length-1; i >= 0; i--) {
+            let base = bases[i];
+            let key = base.__name__+"-"+base.__module__;
+            if (! (key in done)) {
+                iterate_bases(base.__bases__)
+                done[key] = true;
+                result.unshift(base);
+            }
         }
     }
+    iterate_bases(aClass.__bases__);
+    return result;
+}
 
+
+function fetch_base_from_mro(mro, methodName) {
+    while(mro.length) {
+        let base = mro.shift();
+        if (methodName in base)
+            return base[methodName];
+    }
     throw new Exception ('Superclass method not found');    // !!! Improve!
+}
+
+
+// Partial implementation of super () .<methodName> (<params>)
+export function __super__ (aClass, methodName, self) {
+    if (! aClass.__mro__) {
+        Object.defineProperty(aClass, "__mro__", {value: build_mro(aClass), configurable: false});
+    }
+
+    if (!self.__super_callchain__) {
+        self.__super_callchain__ = aClass.__mro__.slice();
+        let method = fetch_base_from_mro(self.__super_callchain__, methodName)
+        return function() {
+            var result = method.apply(null, arguments);
+            delete self.__super_callchain__;
+            return result;
+        }
+    }
+    return fetch_base_from_mro(self.__super_callchain__, methodName);
 }
 
 // Python property installer function, no member since that would bloat classes

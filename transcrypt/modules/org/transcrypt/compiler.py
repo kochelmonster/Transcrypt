@@ -1777,6 +1777,10 @@ class Generator (ast.NodeVisitor):
                                 ),
                                 ast.Constant (
                                     value = node.func.attr  # <methodName>
+                                ),
+                                ast.Name (
+                                    id = 'self',
+                                    ctx = ast.Load
                                 )
                             ],
                             keywords = []
@@ -2730,7 +2734,6 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                     self.emit ('var {} = {}function', self.filterId (nodeName), 'async ' if anAsync else '')
 
             yieldStarIndex = self.fragmentIndex
-
             self.emit (' ')
 
             skipFirstArg = jsCall and not (not isMethod or isStaticMethod or isProperty)
@@ -2762,7 +2765,6 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                 docString = ast.get_docstring (node)
                 if docString:
                     self.emit (' .__setdoc__ (\'{}\')', docString.replace ('\n', '\\n '))
-
 
             if decorate:
                 self.emit (')' * decoratorsUsed)
