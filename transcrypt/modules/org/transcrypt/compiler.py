@@ -2638,6 +2638,7 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
             isClassMethod = False
             isStaticMethod = False
             isProperty = False
+            keep_name = False
             getter = '__get__'
 
             if node.decorator_list:
@@ -2693,6 +2694,7 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                         self.emit ('{}: ', self.filterId (nodeName))
                     else:
                         self.emit ('get {} () {{return {} (this, ', self.filterId (nodeName), getter)
+                        keep_name = True
                 elif isGlobal:
                     if type (node.parentNode) == ast.Module and not nodeName in self.allOwnNames:
                         self.emit ('export ')
@@ -2725,7 +2727,8 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                         if isStaticMethod:
                             self.emit ('get {} () {{return {}function', self.filterId (nodeName), 'async ' if anAsync else '')
                         else:
-                            self.emit ('get {} () {{return {} (this, {}function', self.filterId (nodeName), getter, 'async ' if anAsync else '')
+                            keep_name = True
+                            self.emit ('get {} () {{return {} (this, ({}function', self.filterId (nodeName), getter, 'async ' if anAsync else '')
                 elif isGlobal:
                     if type (node.parentNode) == ast.Module and not nodeName in self.allOwnNames:
                         self.emit ('export ')
@@ -2768,6 +2771,11 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
 
             if decorate:
                 self.emit (')' * decoratorsUsed)
+                if keep_name:
+                    self.emit (', "{}"', self.filterId (nodeName))
+
+            elif keep_name:
+                self.emit ('), "{}"', self.filterId (nodeName))
 
             if isMethod:
                 if not jsCall:

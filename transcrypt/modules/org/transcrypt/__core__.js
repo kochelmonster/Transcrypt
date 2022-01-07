@@ -113,23 +113,28 @@ export function __init__ (module) {
 export function __get__ (aThis, func, quotedFuncName) {// Param aThis is thing before the dot, if it's there
     if (aThis) {
         if (aThis.hasOwnProperty ('__class__') || typeof aThis == 'string' || aThis instanceof String) {           // Object before the dot
+            var bound = function () {                                   // Return bound function, code duplication for efficiency if no memoizing
+                var args = [] .slice.apply (arguments);             // So multilayer search prototype, apply __get__, call curry func that calls func
+                return func.apply (null, [aThis.__proxy__ ? aThis.__proxy__ : aThis] .concat (args));
+            };
+
             if (quotedFuncName) {                                   // Memoize call since fcall is on, by installing bound function in instance
+                Object.defineProperty (bound, "name", {value:quotedFuncName})
+                // copy addintional attributes
+                for(var n in func) {
+                  bound[n] = func[n];
+                }
+                bound.__repr__ = function() {
+                  return "method {} of {}".format(quotedFuncName, repr(aThis)); };
+
                 Object.defineProperty (aThis, quotedFuncName, {      // Will override the non-own property, next time it will be called directly
-                    value: function () {                            // So next time just call curry function that calls function
-                        var args = [] .slice.apply (arguments);
-                        return func.apply (null, [aThis] .concat (args));
-                    },
+                    value: bound,
                     writable: true,
                     enumerable: true,
                     configurable: true
                 });
             }
-            var bound = function () {                                   // Return bound function, code duplication for efficiency if no memoizing
-                var args = [] .slice.apply (arguments);             // So multilayer search prototype, apply __get__, call curry func that calls func
-                return func.apply (null, [aThis.__proxy__ ? aThis.__proxy__ : aThis] .concat (args));
-            };
-            bound.__org__ = func
-            return bound
+            return bound;
         }
         else {                                                      // Class before the dot
             return func;                                            // Return static method
