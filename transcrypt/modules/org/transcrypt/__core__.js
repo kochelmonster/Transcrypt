@@ -236,6 +236,12 @@ export var py_metatype = {
 
         // Add own methods, properties and own static attributes to the created cls object
 
+        if (! ("__init__" in attribs)) {
+            attribs["__init__"] = function() {
+                __super__.call(this, cls, "__init__", arguments[0]).apply(this, arguments);
+            }
+        }
+
         for (var attrib in attribs) {
             var descrip = Object.getOwnPropertyDescriptor (attribs, attrib);
             Object.defineProperty (cls, attrib, descrip);

@@ -59,32 +59,40 @@ function build_mro(aClass) {
 }
 
 
-function fetch_base_from_mro(mro, methodName) {
-    while(mro.length) {
-        let base = mro.shift();
-        if (methodName in base)
-            return base[methodName];
-    }
-    throw new Exception ('Superclass method not found');    // !!! Improve!
-}
-
 
 // Partial implementation of super () .<methodName> (<params>)
 export function __super__ (aClass, methodName, self) {
-    if (! aClass.__mro__) {
-        Object.defineProperty(aClass, "__mro__", {value: build_mro(aClass), configurable: false});
+    let context = this;
+    if (!context || !context.__next_super__) {
+        if (! aClass.__mro__) {
+            Object.defineProperty(
+                aClass, "__mro__", {value: build_mro(aClass), configurable: false});
+        }
+        var mro = aClass.__mro__;
+        var index = 0;
+        var next_super = function() {
+            while(index<mro.length) {
+                let base = mro[index++];
+                if (methodName in base)
+                    return base[methodName];
+            }
+            throw new Exception ('Superclass method not found');    // !!! Improve!
+        }
+
+        if (context) {
+          context = new Proxy(context, {
+             get: function (target, prop, receiver) {
+                if (prop === "__next_super__")
+                    return next_super;
+                return Reflect.get(...arguments);
+              }});
+          }
+          else {
+              context = {__next_super__: next_super};
+          }
     }
 
-    if (!self.__super_callchain__) {
-        self.__super_callchain__ = aClass.__mro__.slice();
-        let method = fetch_base_from_mro(self.__super_callchain__, methodName)
-        return function() {
-            var result = method.apply(null, arguments);
-            delete self.__super_callchain__;
-            return result;
-        }
-    }
-    return fetch_base_from_mro(self.__super_callchain__, methodName);
+    return context.__next_super__().bind(context);
 }
 
 // Python property installer function, no member since that would bloat classes

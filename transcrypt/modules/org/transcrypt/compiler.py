@@ -1767,7 +1767,7 @@ class Generator (ast.NodeVisitor):
                     ast.Call (
                         func = ast.Call (
                             func = ast.Name (
-                                id = '__super__',
+                                id = '__super__.bind(this)',
                                 ctx = ast.Load
                             ),
                             args = [
