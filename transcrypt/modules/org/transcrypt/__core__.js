@@ -119,7 +119,7 @@ export function __get__ (aThis, func, quotedFuncName) {// Param aThis is thing b
             };
 
             if (quotedFuncName) {                                   // Memoize call since fcall is on, by installing bound function in instance
-                Object.defineProperty (bound, "name", {value:quotedFuncName})
+                Object.defineProperty (func, "name", {value:quotedFuncName})
                 // copy addintional attributes
                 for(var n in func) {
                   bound[n] = func[n];
@@ -234,14 +234,13 @@ export var py_metatype = {
         cls.__name__ = name.startsWith ('py_') ? name.slice (3) : name;
         cls.__bases__ = bases;
 
-        // Add own methods, properties and own static attributes to the created cls object
-
         if (! ("__init__" in attribs)) {
             attribs["__init__"] = function() {
                 __super__.call(this, cls, "__init__", arguments[0]).apply(this, arguments);
             }
         }
 
+        // Add own methods, properties and own static attributes to the created cls object
         for (var attrib in attribs) {
             var descrip = Object.getOwnPropertyDescriptor (attribs, attrib);
             Object.defineProperty (cls, attrib, descrip);
@@ -323,9 +322,14 @@ export var object = {
 // Class creator facade function, calls class creation worker
 export function __class__ (name, bases, attribs, meta) {         // Parameter meta is optional
     if (meta === undefined) {
-        meta = bases [0] .__metaclass__;
+        meta = py_metatype;
+        for(let b of bases) {
+            if (b.__metaclass__ !== py_metatype) {
+                meta = b.__metaclass__;
+                break;
+            }
+        }
     }
-
     return meta.__new__ (meta, name, bases, attribs);
 };
 
