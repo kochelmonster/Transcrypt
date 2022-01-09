@@ -39,7 +39,6 @@ export function __globals__ (anObject) {
 }
 */
 
-
 function build_mro(aClass) {
     let done = {}
     let result = [];
@@ -58,30 +57,46 @@ function build_mro(aClass) {
     return result;
 }
 
+function make_mro(cls) {
+  if (! cls.__mro__) {
+      Object.defineProperty(cls, "__mro__", {value: build_mro(cls), configurable: false});
+  }
+  return cls.__mro__;
+}
 
+function create_next_super(cls) {
+  var mro = make_mro(cls);
+  var index = 0;
+  return function(methodName) {
+      while(index < mro.length) {
+          let base = mro[index++];
+          if (methodName in base)
+              return base;
+      }
+      throw new Exception ('Superclass method not found');    // !!! Improve!
+  }
+}
 
 // Partial implementation of super () .<methodName> (<params>)
 export function __super__ (aClass, methodName, self) {
     let context = this;
     if (!context || !context.__next_super__) {
-        if (! aClass.__mro__) {
-            Object.defineProperty(
-                aClass, "__mro__", {value: build_mro(aClass), configurable: false});
+        let next_super = null;
+        let cls = self.__class__ ? self.__class__ : self;
+        if (cls !== aClass) {
+            // we have to decide which mro to use
+            let long_chain = create_next_super(cls);
+            if (long_chain(methodName) === aClass)
+                next_super = long_chain
+            else
+                next_super = create_next_super(aClass);
         }
-        var mro = aClass.__mro__;
-        var index = 0;
-        var next_super = function() {
-            while(index<mro.length) {
-                let base = mro[index++];
-                if (methodName in base)
-                    return base[methodName];
-            }
-            throw new Exception ('Superclass method not found');    // !!! Improve!
-        }
+        else
+            next_super = create_next_super(aClass);
 
         if (context) {
           context = new Proxy(context, {
-             get: function (target, prop, receiver) {
+             get: function (target, prop) {
                 if (prop === "__next_super__")
                     return next_super;
                 return Reflect.get(...arguments);
@@ -92,7 +107,7 @@ export function __super__ (aClass, methodName, self) {
           }
     }
 
-    return context.__next_super__().bind(context);
+    return context.__next_super__(methodName)[methodName].bind(context);
 }
 
 // Python property installer function, no member since that would bloat classes

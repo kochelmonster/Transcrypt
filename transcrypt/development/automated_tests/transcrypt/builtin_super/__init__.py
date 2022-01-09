@@ -132,4 +132,27 @@ def run_chain_test(autoTester):
 
     call_order = []
     U(call_order)
+    autoTester.check(call_order)
+
+    class Mixin:
+        def plugin(self, call_order):
+            call_order.append("Mixin")
+            super().plugin(call_order)
+
+    class Base:
+        def __init__(self, call_order):
+            call_order.append("Base")
+
+        def plugin(self, call_order):
+            call_order.append("Base")
+
+    class Child(Mixin, Base):
+        pass
+
+    call_order = []
+    mixed = Child(call_order)
+    autoTester.check (call_order)
+
+    call_order = []
+    mixed.plugin(call_order)
     autoTester.check (call_order)
