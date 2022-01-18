@@ -70,7 +70,7 @@ function create_next_super(cls) {
   return function(methodName) {
       while(index < mro.length) {
           let base = mro[index++];
-          if (methodName in base)
+          if (methodName in base.__class_attribs__)
               return base;
       }
       throw new Exception ('Superclass method not found');    // !!! Improve!

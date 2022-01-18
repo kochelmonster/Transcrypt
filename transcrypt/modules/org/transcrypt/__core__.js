@@ -197,6 +197,7 @@ function _to_python_descriptor(instance, descript) {
 export var py_metatype = {
     __name__: 'type',
     __bases__: [],
+    __class_attribs__: {__init__: true},
 
     // Overridable class creation worker
     __new__: function (meta, name, bases, attribs) {
@@ -233,6 +234,7 @@ export var py_metatype = {
         cls.__metaclass__ = meta;
         cls.__name__ = name.startsWith ('py_') ? name.slice (3) : name;
         cls.__bases__ = bases;
+        cls.__class_attribs__ = attribs;
 
         if (! ("__init__" in attribs)) {
             attribs["__init__"] = function() {
@@ -271,6 +273,7 @@ export var object = {
 
     __metaclass__: py_metatype, // By default, all classes have metaclass type, since they derive from object
     __name__: 'object',
+    __class_attribs__: {__init__: true},
     __bases__: [],
 
     // Object creator function, is inherited by all classes (so could be global)

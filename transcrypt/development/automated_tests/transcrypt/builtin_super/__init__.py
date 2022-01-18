@@ -149,8 +149,19 @@ def run_chain_test(autoTester):
     class Child(Mixin, Base):
         pass
 
+    class GrandChild(Child):
+        pass
+
     call_order = []
     mixed = Child(call_order)
+    autoTester.check (call_order)
+
+    call_order = []
+    mixed.plugin(call_order)
+    autoTester.check (call_order)
+
+    call_order = []
+    mixed = GrandChild(call_order)
     autoTester.check (call_order)
 
     call_order = []
