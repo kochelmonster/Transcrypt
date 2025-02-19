@@ -624,7 +624,7 @@ export function py_typeof (anObject) {
       return FunctionType;
     }
     else {
-        return (    // Odly, the braces are required here
+        return (    // Oddly, the braces are required here
             aType == 'boolean' ? bool :
             aType == 'string' ? str :
             aType == 'number' ? (anObject % 1 == 0 ? int : float) :
@@ -757,14 +757,64 @@ export function ord (aChar) {
     return aChar.charCodeAt (0);
 };
 
-// Maximum of n numbers
-export function max (nrOrSeq) {
-    return arguments.length == 1 ? Math.max (...nrOrSeq) : Math.max (...arguments);
-};
+function min_max (f_compare, ...args) {
+    // Assume no kwargs
+    let dflt = undefined;
+    function key(x) {return x}
+
+    if (args.length > 0) {
+        if (args[args.length-1] && args[args.length-1].hasOwnProperty ("__kwargtrans__")) {
+            const kwargs = args[args.length - 1];
+            args = args.slice(0, -1);
+            if (kwargs.hasOwnProperty('py_default')) dflt = kwargs['py_default'];
+            if (kwargs.hasOwnProperty('key')) key = kwargs['key'];
+            if (Object.prototype.toString.call(key) !== '[object Function]') throw TypeError("object is not callable", new Error());
+        }
+    }
+
+    if (args.length === 0) throw TypeError("expected at least 1 argument, got 0", new Error ());
+    if (args.length > 1 && dflt !== undefined) throw TypeError("Cannot specify a default with multiple positional arguments", new Error ());
+    if (args.length === 1){
+        if (Object.prototype.toString.call(args[0]) !== '[object Array]') throw TypeError("object is not iterable", new Error());
+        args = args[0];  // Passed in arg is itself an iterable
+    }
+    if (args.length === 0){
+        if (dflt === undefined) throw ValueError ("arg is an empty sequence", new Error ());
+        return dflt
+    }
+
+    return args.reduce((max_val, cur_val) => f_compare(key(cur_val), key(max_val)) ? cur_val : max_val);
+}
+
+// Maximum of n values
+export function max (...args) {
+    return min_max(function (a, b){return a > b}, ...args)
+}
 
 // Minimum of n numbers
-export function min (nrOrSeq) {
-    return arguments.length == 1 ? Math.min (...nrOrSeq) : Math.min (...arguments);
+export function min (...args) {
+    return min_max(function (a, b){return a < b}, ...args)
+}
+
+// Integer to binary
+export function bin (nbr) {
+    const sign = nbr<0 ? '-' : '';
+    const bin_val = Math.abs(parseInt(nbr)).toString(2);
+    return sign.concat('0b', bin_val);
+};
+
+// Integer to octal
+export function oct (nbr) {
+    const sign = nbr<0 ? '-' : '';
+    const oct_val = Math.abs(parseInt(nbr)).toString(8);
+    return sign.concat('0o', oct_val);
+};
+
+// Integer to hexadecimal
+export function hex (nbr) {
+    const sign = nbr<0 ? '-' : '';
+    const hex_val = Math.abs(parseInt(nbr)).toString(16);
+    return sign.concat('0x', hex_val);
 };
 
 // Absolute value
@@ -1006,41 +1056,45 @@ export function sum (iterable) {
 }
 
 // Enumerate method, returning a zipped list
-export function enumerate (iterable) {
-    return zip (range (len (iterable)), iterable);
+export function enumerate(iterable, start = 0) {
+    if (start.hasOwnProperty("__kwargtrans__")) {
+        // start was likely passed in as kwarg
+        start = start['start'];
+    }
+    return zip(range(start, len(iterable) + start), iterable);
 }
 
 // Shallow and deepcopy
 
-export function copy (anObject) {
-    if (anObject == null || typeof anObject == "object") {
-        return anObject;
-    }
-    else {
-        var result = {};
-        for (var attrib in obj) {
-            if (anObject.hasOwnProperty (attrib)) {
-                result [attrib] = anObject [attrib];
-            }
-        }
-        return result;
-    }
-}
-
-export function deepcopy (anObject) {
-    if (anObject == null || typeof anObject == "object") {
-        return anObject;
-    }
-    else {
-        var result = {};
-        for (var attrib in obj) {
-            if (anObject.hasOwnProperty (attrib)) {
-                result [attrib] = deepcopy (anObject [attrib]);
-            }
-        }
-        return result;
-    }
-}
+// export function copy (anObject) {
+//     if (anObject == null || typeof anObject == "object") {
+//         return anObject;
+//     }
+//     else {
+//         var result = {};
+//         for (var attrib in obj) {
+//             if (anObject.hasOwnProperty (attrib)) {
+//                 result [attrib] = anObject [attrib];
+//             }
+//         }
+//         return result;
+//     }
+// }
+//
+// export function deepcopy (anObject) {
+//     if (anObject == null || typeof anObject == "object") {
+//         return anObject;
+//     }
+//     else {
+//         var result = {};
+//         for (var attrib in obj) {
+//             if (anObject.hasOwnProperty (attrib)) {
+//                 result [attrib] = deepcopy (anObject [attrib]);
+//             }
+//         }
+//         return result;
+//     }
+// }
 
 // List extensions to Array
 
@@ -1492,14 +1546,17 @@ String.prototype.capitalize = function () {
     return this.charAt (0).toUpperCase () + this.slice (1);
 };
 
-String.prototype.endswith = function (suffix) {
+String.prototype.endswith = function (suffix, start=0, end) {
+    if (end === undefined) {end = this.length}
+    const str = this.slice(start, end)
+
     if (suffix instanceof Array) {
         for (var i=0;i<suffix.length;i++) {
-            if (this.slice (-suffix[i].length) == suffix[i])
+            if (str.slice (-suffix[i].length) === suffix[i])
                 return true;
         }
     } else
-        return suffix == '' || this.slice (-suffix.length) == suffix;
+        return suffix === '' || str.slice (-suffix.length) === suffix;
     return false;
 };
 
@@ -1725,7 +1782,15 @@ String.prototype.lower = function () {
 };
 
 String.prototype.py_replace = function (old, aNew, maxreplace) {
-    return this.split (old, maxreplace) .join (aNew);
+    if (maxreplace === undefined || maxreplace < 0) {
+        return this.split(old).join(aNew);
+    } else if (maxreplace === 0) {
+        return this;
+    } else {
+        const pre = this.split(old, maxreplace).join(aNew);
+        const rest = this.slice(this.split(old, maxreplace).join(old).length + 1)
+        return pre.concat(rest.length>0 ? aNew : '', rest);
+    }
 };
 
 String.prototype.lstrip = function (chars) {
@@ -1801,16 +1866,20 @@ String.prototype.py_split = function (sep, maxsplit) {  // Combination of genera
     }
 };
 
-String.prototype.startswith = function (prefix) {
+String.prototype.startswith = function (prefix, start=0, end) {
+    if (end === undefined) {end = this.length}
+    const str = this.slice(start, end)
+
     if (prefix instanceof Array) {
-        for (var i=0;i<prefix.length;i++) {
-            if (this.indexOf (prefix [i]) == 0)
+        for (let i=0;i<prefix.length;i++) {
+            if (str.indexOf (prefix [i]) === 0)
                 return true;
         }
-    } else
-        return this.indexOf (prefix) == 0;
+    } else {
+        return str.indexOf(prefix) === 0;
+    }
     return false;
-};
+}
 
 String.prototype.strip = function (chars) {
     if (chars) {
