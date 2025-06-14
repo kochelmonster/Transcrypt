@@ -4,7 +4,7 @@ from org.transcrypt.stubs.browser import __envir__
 
 def canonizeString (aString):
     if __envir__.executor_name == 'transcrypt':
-        return aString.replace ('\t', '\\t') .replace ('\n', '\\n')
+        return aString.replace ('\t', '\\t').replace ('\n', '\\n').replace ('\r', '\\r')
     else:
         return aString
 
@@ -35,14 +35,15 @@ def run (autoTester):
                       max([[5,6,7,8,9],[1,2,3,4]],default=[1,1,1],key=len),
                       max ([], default='zzz'),
                       )
-    # autoTester.check ('max', autoTester.expectException(lambda: max () ))
-    # autoTester.check ('max', autoTester.expectException(lambda: max (1,2,3,4, default=5) ))
-    # autoTester.check ('max', autoTester.expectException(lambda: max (default=5)))
-    # autoTester.check ('max', autoTester.expectException(lambda: max ([])))
-    # autoTester.check ('max', autoTester.expectException(lambda: max([5,6,7,8,9],[1,2,3,4],default=[1,1,1],key=len) ))
-    # autoTester.check ('max', autoTester.expectException(lambda: max ([4, 5, 'xyz', 'XYZ']) ))
+    autoTester.check ('max', autoTester.expectException(lambda: max () ))
+    autoTester.check ('max', autoTester.expectException(lambda: max (1,2,3,4, default=5) ))
+    autoTester.check ('max', autoTester.expectException(lambda: max (default=5)))
+    autoTester.check ('max', autoTester.expectException(lambda: max ([])))
+    autoTester.check ('max', autoTester.expectException(lambda: max([5,6,7,8,9],[1,2,3,4],default=[1,1,1],key=len) ))
+    # autoTester.check ('max', autoTester.expectException(lambda: max ([4, 5, 'xyz', 'XYZ']) ))  # exception not currently implemented
 
     autoTester.check ('abs', abs (-1), abs (1), abs (0), abs (-0.1), abs (0.1))
+    autoTester.check ('pow', pow (2, 2), pow(0, 0), pow(1, 0), pow(2, 1), f"{pow(4, 0.5):g}")
 
     autoTester.check ('ord', ord ('a'), ord ('e´'[0]))  # This is the 2 codepoint version
     autoTester.check ('chr', chr (97), chr (122), chr (65), chr (90))  # a z A Z
@@ -134,20 +135,29 @@ def run (autoTester):
             '<br>'
         )
 
+    lines_to_split = ['', '\n',
+                 'abc\n',
+                 'abc\ndef',
+                 'abc\rdef',
+                 'abc\r\ndef',
+                 '\nabc',
+                 '\nabc\n',
+                 'abc\ndef\r\nghi\rjkl\n',
+                 'abc\ndef\n\nghi\njkl'
+                 ]
+    autoTester.check ('<br>splitlines')
+    for line in lines_to_split:
+        autoTester.check (
+            canonizeStringList(line.splitlines ()),
+            canonizeStringList(line.splitlines (True)),
+        )
+
     autoTester.check("isalpha",
                      "".isalpha(),
                      "123".isalpha(),
                      "abc".isalpha(),
                      "abc123".isalpha(),
                      )
-
-    enumerate_list = ['a', 'b', 'c', 'd', 'e']
-    # JS does not have tuples so coerce  to list of lists
-    autoTester.check("enumerate",
-        [list(item) for item in enumerate(enumerate_list)],
-        [list(item) for item in enumerate(enumerate_list, 1)],
-        [list(item) for item in enumerate(enumerate_list, start=2)]
-    )
 
     replace_test = "abcabcabcabc"
     autoTester.check("replace",

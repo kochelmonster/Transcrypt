@@ -551,6 +551,7 @@ class Generator (ast.NodeVisitor):
                                                     ('js_conjugate', 'conjugate'),
             ('default', 'py_default'),
             ('del', 'py_del'),                      ('js_del', 'del'),
+            ('enumerate', 'py_enumerate'),
             ('false', 'py_false'),
                                                     ('js_from', 'from'),
             ('get', 'py_get'),                      ('js_get', 'get'),
@@ -577,7 +578,10 @@ class Generator (ast.NodeVisitor):
             ('type', 'py_metatype'),                ('js_type', 'type'),    # Only for the type metaclass, the type operator is dealt with separately in visit_Call
             ('TypeError', 'py_TypeError'),          ('js_TypeError', 'TypeError'),
             ('update', 'py_update'),                ('js_update', 'update'),
+            ('copy', 'py_copy'),                    ('js_copy', 'copy'),
+            ('deepcopy', 'py_deepcopy'),            ('js_deepcopy', 'deepcopy'),
             ('values', 'py_values'),                ('js_values', 'values'),
+            ('fromkeys', 'py_fromkeys'),
             ('reversed', 'py_reversed'),            ('js_reversed', 'reversed'),
             ('setdefault', 'py_setdefault'),        ('js_setdefault', 'setdefault'),
                                                     ('js_super', 'super'),
@@ -2079,7 +2083,7 @@ class Generator (ast.NodeVisitor):
         if self.allowDocAttribs:
             docString = ast.get_docstring (node)
             if docString:
-               self.emit (' .__setdoc__ (\'{}\')', docString.replace ('\n', '\\n '))
+               self.emit (' .__setdoc__ (\'{}\')', docString.replace ('\n', '\\n ').replace('\'', '\\\''))
 
         # Deal with data class var assigns, a flavor of special class var assigns
         if isDataClass: # Constructor + params have to be generated, no real class vars, just syntactically
@@ -2767,7 +2771,7 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
             if self.allowDocAttribs:
                 docString = ast.get_docstring (node)
                 if docString:
-                    self.emit (' .__setdoc__ (\'{}\')', docString.replace ('\n', '\\n '))
+                    self.emit (' .__setdoc__ (\'{}\')', docString.replace ('\n', '\\n ').replace('\'', '\\\''))
 
             if decorate:
                 self.emit (')' * decoratorsUsed)
@@ -3140,7 +3144,7 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
 
         # Insert docstring at hoist location, further hoists are PRE(!)pended
         if self.allowDocAttribs and docString:
-            self.emit ('export var __doc__ = \'{}\';\n', docString.replace ('\n', '\\n'))
+            self.emit ('export var __doc__ = \'{}\';\n', docString.replace ('\n', '\\n').replace ('\'', '\\\''))
 
         '''
         Make the globals () function work as well as possible in conjunction with JavaScript 6 modules rather than closures
@@ -3320,7 +3324,8 @@ return list (selfFields).''' + comparatorName + '''(list (otherFields));
                 self.emit ('.__getslice__ (')
 
             if node.slice.lower == None:
-                self.emit ('0')
+                # self.emit ('0')
+                self.emit ('null')
             else:
                 self.visit (node.slice.lower)
             self.emit (', ')

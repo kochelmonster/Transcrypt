@@ -79,14 +79,64 @@ def run (autoTester):
         
     tel = {'guido': 123}
     tel.update({'edsger': 42})
+    autoTester.check (tel)
     autoTester.check (tel.setdefault ('linus', 456))
     autoTester.check (tel ['linus'])
     autoTester.check (tel.setdefault ('guido', 789))
+    autoTester.check (tel.setdefault ('dennis', None))
+    autoTester.check (tel.setdefault ('brian'))
+    autoTester.check (tel)
     autoTester.check (tel.pop ('guido', 1))
     autoTester.check (tel.pop ('guido', 1))
     autoTester.check (tel.pop ('edsger', 2))
     autoTester.check (tel.pop ('foo', 'bar'))
     autoTester.check (tel.pop ('foo', None))
+    autoTester.check (tel.get ('baz', 111))
+    autoTester.check (tel.get ('baz'))
+    autoTester.check (tel.get ('baz', None))
+    autoTester.check (tel)
+    autoTester.check (tel.popitem())
+    autoTester.check (tel.popitem())
+    autoTester.check (tel.popitem())
+    autoTester.check (tel)
+    autoTester.check ("dictionary is empty",
+        autoTester.expectException ( lambda: tel.popitem() )
+    )
+
+    d1 = {'c': 2, 'a': 3, 'd': 4, 'b': 1}
+    autoTester.check(d1)
+    d2 = d1.copy()
+    autoTester.check(d2)
+    d1['a'] = 5
+    d2['c'] = 6
+    autoTester.check(d1)
+    autoTester.check(d2)
+    d1['d'] = [3, 1, 2]
+    autoTester.check(d1)
+    d3 = d1.copy()
+    autoTester.check(d3)
+    d3['d'][1] = 9
+    autoTester.check(d1)
+    autoTester.check(d3)
+    d4 = {}
+    d5 = d4.copy()
+    autoTester.check(d5)
+
+    autoTester.check(dict.fromkeys(['b', 'c', 'a']))
+    autoTester.check(dict.fromkeys(['b', 'c', 'a'], '42'))
+    autoTester.check(dict.fromkeys('bca'))
+    autoTester.check(d1.fromkeys('bca'))
+    autoTester.check(d1.fromkeys(['b', 'c', 'a']))
+    autoTester.check(d1.fromkeys(['b', 'c', 'a'], '42'))
+    autoTester.check({}.fromkeys(['b', 'c', 'a']))
+
+    autoTester.check ("not iterable", autoTester.expectException ( lambda: dict.fromkeys(42) ))
+    autoTester.check ("missing argument", autoTester.expectException ( lambda: dict.fromkeys() ))
+
+    # Check pop of None value (issue 827)
+    a = {'hello': None}
+    value = a.pop('hello', '<DEFAULT>')
+    autoTester.check('value = ', value, '; a = ', a)
 
     # Check compound keys (issue 281)
     d = {}
@@ -98,6 +148,7 @@ def run (autoTester):
     d = {}
     d ['a'] = 3777
     d [(1, 2)] = 4777
+    # autoTester.check (d)  # Test fails - JS only supports string keys
     autoTester.check (d ['a'], d [(1, 2)])
     __pragma__ ('noopov')
 

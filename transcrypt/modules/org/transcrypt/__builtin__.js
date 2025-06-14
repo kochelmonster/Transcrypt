@@ -924,20 +924,22 @@ export function py_iter (iterable) {                   // Alias for Python's ite
     return result;
 }
 
-export function py_next (iterator) {               // Called only in a Python context, could receive Python or JavaScript iterator
+export function py_next (iterator, value) {               // Called only in a Python context, could receive Python or JavaScript iterator
     try {                                   // Primarily assume Python iterator, for max speed
         var result = iterator.__next__ ();
     }
     catch (exception) {                     // JavaScript iterators are the exception here
         var result = iterator.next ();
         if (result.done) {
+            if(!(value === undefined)) return value
             throw StopIteration (new Error ());
         }
         else {
             return result.value;
         }
     }
-    if (result == undefined) {
+    if (result === undefined) {
+        if(!(value === undefined)) return value
         throw StopIteration (new Error ());
     }
     else {
@@ -948,6 +950,7 @@ export function py_next (iterator) {               // Called only in a Python co
 export function __PyIterator__ (iterable) {
     this.iterable = iterable;
     this.index = 0;
+    this.__len__ = function () {return iterable.length};
 }
 
 __PyIterator__.prototype.__next__ = function() {
@@ -1055,46 +1058,18 @@ export function sum (iterable) {
     return result;
 }
 
-// Enumerate method, returning a zipped list
-export function enumerate(iterable, start = 0) {
+function* __enumerate__ (iterable, start=0) {
     if (start.hasOwnProperty("__kwargtrans__")) {
         // start was likely passed in as kwarg
         start = start['start'];
     }
-    return zip(range(start, len(iterable) + start), iterable);
+    let n = start
+    for (const item of iterable) {
+        yield [n, item]
+        n += 1
+    }
 }
-
-// Shallow and deepcopy
-
-// export function copy (anObject) {
-//     if (anObject == null || typeof anObject == "object") {
-//         return anObject;
-//     }
-//     else {
-//         var result = {};
-//         for (var attrib in obj) {
-//             if (anObject.hasOwnProperty (attrib)) {
-//                 result [attrib] = anObject [attrib];
-//             }
-//         }
-//         return result;
-//     }
-// }
-//
-// export function deepcopy (anObject) {
-//     if (anObject == null || typeof anObject == "object") {
-//         return anObject;
-//     }
-//     else {
-//         var result = {};
-//         for (var attrib in obj) {
-//             if (anObject.hasOwnProperty (attrib)) {
-//                 result [attrib] = deepcopy (anObject [attrib]);
-//             }
-//         }
-//         return result;
-//     }
-// }
+export var py_enumerate = __enumerate__;  // Exporting a generator function in JS may be problematic but it allows enumerate to be lazy
 
 // List extensions to Array
 
@@ -1110,52 +1085,91 @@ list.__bases__ = [object];
 Array.prototype.__iter__ = function () {return new __PyIterator__ (this);};
 
 Array.prototype.__getslice__ = function (start, stop, step) {
+    if (step === null) {
+        step = 1;
+    }
+    if (start === null) {
+        start = (step < 0 ? -1 : 0);
+    }
     if (start < 0) {
-        start = this.length + start;
+        start = Math.max(this.length + start, 0);
+    } else if (start > this.length || (start === this.length && step < 0)) {
+        start = this.length > 0 ? this.length - 1 : 0;
     }
 
-    if (stop == null) {
-        stop = this.length;
-    }
-    else if (stop < 0) {
-        stop = this.length + stop;
-    }
-    else if (stop > this.length) {
+    if (stop === null) {
+        stop = (step < 0 && this.length > 0 ? -1 : this.length);
+    } else if (stop < 0) {
+        stop = Math.max(this.length + stop, (step < 0 && this.length > 0 ? -1 : 0));
+    } else if (stop > this.length) {
         stop = this.length;
     }
 
-    if (step == 1) {
+    if (step === 1) {
         return Array.prototype.slice.call(this, start, stop);
     }
 
     let result = list ([]);
-    for (let index = start; index < stop; index += step) {
-        result.push (this [index]);
+    if (step > 0) {
+        for (let index = start; index < stop; index += step) {
+            result.push (this [index]);
+        }
+    } else if (step < 0) {
+        for (let index = start; index > stop; index += step) {
+            result.push (this [index]);
+        }
+    } else {
+        throw ValueError ("slice step cannot be zero", new Error ());
     }
 
     return result;
 };
 
 Array.prototype.__setslice__ = function (start, stop, step, source) {
+    if (step === null) {
+        step = 1;
+    }
+    if (start === null) {
+        start = (step < 0 ? -1 : 0);
+    }
     if (start < 0) {
-        start = this.length + start;
+        start = Math.max(this.length + start, 0);
+    } else if (start > this.length || (start === this.length && step < 0)) {
+        start = this.length > 0 ? this.length - 1 : 0;
     }
 
-    if (stop == null) {
+    if (stop === null) {
+        stop = (step < 0 && this.length > 0 ? -1 : this.length);
+    } else if (stop < 0) {
+        stop = Math.max(this.length + stop, (step < 0 && this.length > 0 ? -1 : 0));
+    } else if (stop > this.length) {
         stop = this.length;
     }
-    else if (stop < 0) {
-        stop = this.length + stop;
-    }
 
-    if (step == null) { // Assign to 'ordinary' slice, replace subsequence
-        Array.prototype.splice.apply (this, [start, stop - start] .concat (source));
+    if (step === 1) { // Assign to 'ordinary' slice, replace subsequence
+        Array.prototype.splice.apply (this, [start, stop - start] .concat (Array.from(source)));
     }
-    else {              // Assign to extended slice, replace designated items one by one
-        let sourceIndex = 0;
-        for (let targetIndex = start; targetIndex < stop; targetIndex += step) {
-            this [targetIndex] = source [sourceIndex++];
+    else {
+        // Validate assignment is valid based on Python's size rules
+        const seq_len = Math.ceil((stop - start) / step)
+        if((source.length > 0 || seq_len > 0) && (seq_len !== source.length)){
+            // throw ValueError ("Invalid slice assignment", new Error ());
+            throw ValueError ("attempt to assign sequence of size " + source.length + " to extended slice of size " + seq_len, new Error ());
         }
+        // Assign to extended slice, replace designated items one by one
+        let sourceIndex = 0;
+        if (step > 0) {
+            for (let targetIndex = start; targetIndex < stop; targetIndex += step) {
+                this [targetIndex] = source [sourceIndex++];
+            }
+        } else if (step < 0) {
+            for (let targetIndex = start; targetIndex > stop; targetIndex += step) {
+                this [targetIndex] = source [sourceIndex++];
+            }
+        } else {
+            throw ValueError ("slice step cannot be zero", new Error ());
+        }
+
     }
 };
 
@@ -1191,6 +1205,10 @@ Array.prototype.py_clear = function () {
     this.length = 0;
 };
 
+Array.prototype.py_copy = function () {
+    return this.slice();
+};
+
 Array.prototype.extend = function (aList) {
     this.push.apply (this, aList);
 };
@@ -1201,8 +1219,8 @@ Array.prototype.insert = function (index, element) {
 
 Array.prototype.remove = function (element) {
     let index = this.indexOf (element);
-    if (index == -1) {
-        throw ValueError ("list.remove(x): x not in list", new Error ());
+    if (index === -1) {
+        throw ValueError("list.remove(x): x not in list", new Error ());
     }
     this.splice (index, 1);
 };
@@ -1212,11 +1230,18 @@ Array.prototype.index = function (element) {
 };
 
 Array.prototype.py_pop = function (index) {
-    if (index == undefined) {
+    if(this.length === 0){
+        throw IndexError("pop from empty list", new Error())
+    }
+    if (index === undefined) {
         return this.pop ();  // Remove last element
     }
     else {
-        return this.splice (index, 1) [0];
+        const idx = index < 0 ? this.length + index : index
+        if(this[idx] === undefined){
+            throw IndexError("pop index out of range", new Error())
+        }
+        return this.splice (idx, 1) [0];
     }
 };
 
@@ -1565,26 +1590,44 @@ String.prototype.find = function (sub, start) {
 };
 
 String.prototype.__getslice__ = function (start, stop, step) {
+    if (step === null) {
+        step = 1;
+    }
+    if (start === null) {
+        start = (step < 0 ? -1 : 0);
+    }
     if (start < 0) {
-        start = this.length + start;
+        start = Math.max(this.length + start, 0);
+    } else if (start > this.length) {
+        start = this.length > 0 ? this.length + (step < 0 ? -1 : 0) : 0;
     }
 
-    if (stop == null) {
+    if (stop === null) {
+        stop = (step < 0 && this.length > 0 ? -1 : this.length);
+    } else if (stop < 0) {
+        stop = Math.max(this.length + stop, (step < 0 && this.length > 0 ? -1 : 0));
+    } else if (stop > this.length) {
         stop = this.length;
     }
-    else if (stop < 0) {
-        stop = this.length + stop;
+
+    if (step === 1) {
+        return this.substring (start, (start > stop ? start : stop));
     }
 
-    var result = '';
-    if (step == 1) {
-        result = this.substring (start, stop);
-    }
-    else {
+    let result = '';
+    if (step > 0) {
         for (var index = start; index < stop; index += step) {
             result = result.concat (this.charAt(index));
         }
+    } else if (step < 0) {
+        for (var index = start; index > stop; index += step) {
+            result = result.concat (this.charAt(index));
+        }
     }
+    else {
+        throw ValueError ("slice step cannot be zero", new Error ());
+    }
+
     return result;
 };
 
@@ -1866,6 +1909,19 @@ String.prototype.py_split = function (sep, maxsplit) {  // Combination of genera
     }
 };
 
+String.prototype.splitlines = function (keepends) {
+    if (this.length === 0) {
+        return [];
+    }
+
+    if (keepends === undefined || keepends === null || keepends === false) {
+        return this.trimEnd().split(/\r?\n|\r|\n/g);
+    }
+    else {
+        return this.split(/(?<=\n)(?=\n)|(?<=[\r\n])(?=[^\r\n])/g);
+    }
+};
+
 String.prototype.startswith = function (prefix, start=0, end) {
     if (end === undefined) {end = this.length}
     const str = this.slice(start, end)
@@ -1940,25 +1996,25 @@ function __clear__ () {
 
 function __getdefault__ (aKey, aDefault) {  // Each Python object already has a function called __get__, so we call this one __getdefault__
     var result = this [aKey];
-    if (result == undefined) {
+    if (result === undefined) {
         result = this ['py_' + aKey]
     }
-    return result == undefined ? (aDefault == undefined ? null : aDefault) : result;
+    return result === undefined ? (aDefault === undefined ? null : aDefault) : result;
 }
 
 function __setdefault__ (aKey, aDefault) {
     var result = this [aKey];
-    if (result != undefined) {
+    if (result !== undefined) {
         return result;
     }
-    var val = aDefault == undefined ? null : aDefault;
+    var val = aDefault === undefined ? null : aDefault;
     this [aKey] = val;
     return val;
 }
 
 function __pop__ (aKey, aDefault) {
     var result = this [aKey];
-    if (result != undefined) {
+    if (result !== undefined) {
         delete this [aKey];
         return result;
     } else {
@@ -1971,11 +2027,12 @@ function __pop__ (aKey, aDefault) {
 }
 
 function __popitem__ () {
-    var aKey = Object.keys (this) [0];
-    if (aKey == null) {
+    const aKeys = Object.keys (this);
+    if (aKeys.length === 0) {
         throw KeyError ("popitem(): dictionary is empty", new Error ());
     }
-    var result = tuple ([aKey, this [aKey]]);
+    const aKey = aKeys[aKeys.length - 1]
+    const result = tuple ([aKey, this [aKey]]);
     delete this [aKey];
     return result;
 }
@@ -1984,6 +2041,30 @@ function __update__ (aDict) {
     for (var aKey in aDict) {
         this [aKey] = aDict [aKey];
     }
+}
+
+function __copy__ () {
+    let dNew = {};
+    for (let attrib in this) {
+        dNew[attrib] = this[attrib];
+    }
+    return dict(dNew);
+}
+
+function __fromkeys__ (iterable, defVal) {
+    if(iterable === undefined){
+        throw TypeError("fromkeys expected at least 1 argument, got 0")
+    }
+    if ( !(['[object Array]', '[object String]'].includes(Object.prototype.toString.call(iterable))) ) {
+        throw TypeError("object is not iterable", new Error());
+    }
+
+    if(defVal === undefined) defVal = null;
+    let dNew = {};
+    for (let idx= 0; idx < iterable.length; idx++) {
+        dNew[iterable[idx]] = defVal;
+    }
+    return dict(dNew);
 }
 
 function __values__ () {
@@ -2006,19 +2087,19 @@ function __dsetitem__ (aKey, aValue) {
 }
 
 export function dict (objectOrPairs) {
-    var instance = {};
+    let instance = {};
     if (!objectOrPairs || objectOrPairs instanceof Array) { // It's undefined or an array of pairs
         if (objectOrPairs) {
-            for (var index = 0; index < objectOrPairs.length; index++) {
-                var pair = objectOrPairs [index];
-                if ( !(pair instanceof Array) || pair.length != 2) {
+            for (let index = 0; index < objectOrPairs.length; index++) {
+                const pair = objectOrPairs [index];
+                if ( !(pair instanceof Array) || pair.length !== 2) {
                     throw ValueError(
                         "dict update sequence element #" + index +
                         " has length " + pair.length +
                         "; 2 is required", new Error());
                 }
-                var key = pair [0];
-                var val = pair [1];
+                const key = pair [0];
+                let val = pair [1];
                 if (!(objectOrPairs instanceof Array) && objectOrPairs instanceof Object) {
                      // User can potentially pass in an object
                      // that has a hierarchy of objects. This
@@ -2036,14 +2117,14 @@ export function dict (objectOrPairs) {
     }
     else {
         if (isinstance (objectOrPairs, dict)) {
-            // Passed object is a dict already so we need to be a little careful
+            // Passed object is a dict already, so we need to be a little careful
             // N.B. - this is a shallow copy per python std - so
             // it is assumed that children have already become
             // python objects at some point.
-
-            var aKeys = objectOrPairs.py_keys ();
-            for (var index = 0; index < aKeys.length; index++ ) {
-                var key = aKeys [index];
+            
+            const aKeys = objectOrPairs.py_keys ();
+            for (let index = 0; index < aKeys.length; index++ ) {
+                const key = aKeys [index];
                 instance [key] = objectOrPairs [key];
             }
         } else if (objectOrPairs instanceof Object) {
@@ -2058,7 +2139,7 @@ export function dict (objectOrPairs) {
         }
     }
 
-    // Trancrypt interprets e.g. {aKey: 'aValue'} as a Python dict literal rather than a JavaScript object literal
+    // Transcrypt interprets e.g. {aKey: 'aValue'} as a Python dict literal rather than a JavaScript object literal
     // So dict literals rather than bare Object literals will be passed to JavaScript libraries
     // Some JavaScript libraries call all enumerable callable properties of an object that's passed to them
     // So the properties of a dict should be non-enumerable
@@ -2075,7 +2156,9 @@ export function dict (objectOrPairs) {
     __setproperty__ (instance, 'py_pop', {value: __pop__, enumerable: false});
     __setproperty__ (instance, 'py_popitem', {value: __popitem__, enumerable: false});
     __setproperty__ (instance, 'py_update', {value: __update__, enumerable: false});
+    __setproperty__ (instance, 'py_copy', {value: __copy__, enumerable: false});
     __setproperty__ (instance, 'py_values', {value: __values__, enumerable: false});
+    __setproperty__ (instance, 'py_fromkeys', {value: __fromkeys__, enumerable: false});
     __setproperty__ (instance, '__getitem__', {value: __dgetitem__, enumerable: false});    // Needed since compound keys necessarily
     __setproperty__ (instance, '__setitem__', {value: __dsetitem__, enumerable: false});    // trigger overloading to deal with slices
     return instance;
@@ -2083,6 +2166,7 @@ export function dict (objectOrPairs) {
 
 dict.__name__ = 'dict';
 dict.__bases__ = [object];
+dict.py_fromkeys = __fromkeys__
 
 // Docstring setter
 
@@ -2133,7 +2217,7 @@ export function __pow__ (a, b) {
     }
 };
 
-export var pow = __pow__;   // Make available as builin under usual name
+export var pow = __pow__;   // Make available as builtin under usual name
 
 __pragma__ ('ifndef', '__xtiny__')
 
@@ -2561,15 +2645,19 @@ export function __getitem__ (container, key) {                           // Slic
     if (typeof container == 'object' && '__getitem__' in container) {
         return container.__getitem__ (key);                             // Overloaded on container
     }
-    else if ((typeof container == 'string' || container instanceof Array) && key < 0) {
-        return container [container.length + key];
+    else if ( ['[object Array]', '[object String]'].includes(Object.prototype.toString.call(container)) ) {
+        const result = container[key < 0 ? container.length + key : key];
+        if (result === undefined) {
+            throw IndexError ("index out of range", new Error());
+        }
+        return result;
     }
     else {
         return container [key];                                         // Container must support bare JavaScript brackets
         /*
         If it turns out keychecks really have to be supported here, the following will work
         return __k__ (container, key);
-        Could be inlined rather than a call, but performance not crucial since non overloaded [] in context of overloaded [] is rare
+        Could be inlined rather than a call, but performance not crucial since non-overloaded [] in context of overloaded [] is rare
         High volume numerical code will use Numscrypt anyhow which does many things via shortcuts
         */
     }
